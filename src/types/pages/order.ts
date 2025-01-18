@@ -101,13 +101,6 @@ interface IDeliveryDetails {
 export interface IOrderFilter {
   id: string;
   search: string;
-  status: string[];
-  paymentStatus: string[];
-  date: string;
-  customDate: {
-    startDate: string;
-    endDate: string;
-  };
 }
 
 export interface IApiQueryParamsBase {

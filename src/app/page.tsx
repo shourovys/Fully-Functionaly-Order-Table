@@ -1,9 +1,7 @@
 'use client';
 import { fetcher } from '@/api/swrConfig';
 import { orderUrls } from '@/api/urls';
-import Breadcrumbs from '@/components/layout/Breadcrumbs';
 import TableBodyLoading from '@/components/loading/TableBodyLoading';
-import OrderTableInfo from '@/components/pages/order/OrderTableInfo';
 import OrderTableRow from '@/components/pages/order/OrderTableRow';
 import OrderTableToolbar from '@/components/pages/order/OrderTableToolbar';
 import Pagination from '@/components/table/pagination/Pagination';
@@ -12,16 +10,16 @@ import TableEmptyRows from '@/components/table/TableEmptyRows';
 import TableHeader from '@/components/table/TableHeader';
 import TableNoData from '@/components/table/TableNoData';
 import { useFilter } from '@/hooks/useFilter';
-import { useApiQueryParams } from '@/hooks/useOrderApiQueryPparams';
 import useTable, { emptyRows } from '@/hooks/useTable';
-import { IActionsButton } from '@/types/components/actionButtons';
 import { ITableHead } from '@/types/components/table';
-import { IOrderFilter, IOrderResponse } from '@/types/pages/order';
-import downloadCsv from '@/utils/downloadCsv';
-import { createIcon, exportIcon } from '@/utils/icons';
+import {
+  IOrderApiQueryParams,
+  IOrderFilter,
+  IOrderResponse,
+} from '@/types/pages/order';
+import QueryString from 'qs';
 import { useEffect } from 'react';
 import useSWR from 'swr';
-import useSWRMutation from 'swr/mutation';
 
 export default function Home() {
   // Custom hook managing table state and handlers
@@ -54,10 +52,6 @@ export default function Home() {
   const initialFilterState: IOrderFilter = {
     id: '',
     search: '',
-    status: ['All'],
-    paymentStatus: [],
-    date: '',
-    customDate: { startDate: '', endDate: '' },
   };
 
   // State and handlers for managing filters using a custom hook
@@ -69,17 +63,18 @@ export default function Home() {
   } = useFilter(initialFilterState);
 
   // Create query params for the API using a custom hook
-  const apiQueryParamsString = useApiQueryParams({
-    page,
-    rowsPerPage,
-    orderBy,
+  const apiQueryParamsString: IOrderApiQueryParams = {
+    offset: (page - 1) * rowsPerPage,
+    limit: rowsPerPage,
+    sort_by: orderBy,
     order,
-    filterState,
-  });
+    ...(filterState.id && { id: filterState.id }),
+    ...(filterState.search && { search: filterState.search }),
+  };
 
   // Fetch data using SWR with the generated query string
   const { isLoading, data, error } = useSWR<IOrderResponse>(
-    orderUrls.list(apiQueryParamsString),
+    orderUrls.list(QueryString.stringify(apiQueryParamsString)),
     fetcher
   );
 
@@ -88,51 +83,14 @@ export default function Home() {
     handleChangePage(1);
   }, [filterState]);
 
-  // mutation for fetch csv data from server and call downloadCsc
-  const { trigger: csvDataTrigger, isMutating: csvDataLoading } =
-    useSWRMutation(orderUrls.export(apiQueryParamsString), fetcher, {
-      onSuccess: (csvData) => {
-        downloadCsv(csvData, 'orders');
-      },
-    });
-
-  // Define actions for breadcrumb buttons
-  const breadcrumbsActionsButtons: IActionsButton[] = [
-    {
-      color: 'outline',
-      icon: exportIcon,
-      iconClass: '-rotate-90',
-      text: 'Export',
-      onClick: () => csvDataTrigger(),
-      isLoading: csvDataLoading,
-    },
-    {
-      color: 'primary',
-      icon: createIcon,
-      text: 'Create Order',
-      onClick: () => {},
-    },
-  ];
-
   // Check if no data is found
   const isNotFound = !data?.count && !isLoading && !error;
 
   return (
     <div>
-      {/* Breadcrumbs with actions */}
-      <Breadcrumbs
-        pageTitle='Orders'
-        breadcrumbsActionsButtons={breadcrumbsActionsButtons}
-      />
-
       {/* Main Table Container */}
       <div className='bg-white rounded-xl border border-primaryBorder shadow-table'>
-        {/* Order Table Info and Toolbar */}
-        <OrderTableInfo
-          data={data}
-          filterState={filterState}
-          handleFilterInputChange={handleFilterInputChange}
-        />
+        {/* Order Table Toolbar */}
         <OrderTableToolbar
           data={data}
           filterState={filterState}
